@@ -28,9 +28,37 @@ submission_repo/
 
 ## Requirements
 
-One environment for all four reports: **R 4.5 + Seurat 5.x**. Package list in
-`DESCRIPTION`. 01/04 exercise Seurat/plotly/htmlwidgets; 02/03 need only
-`data.table`, `dplyr`, `tidyr`, `ggplot2`, `ComplexHeatmap`.
+One environment for all four reports: **R ≥ 4.5** with **Seurat 5.x**. The full
+declared list (with the pinned floor versions) is in `DESCRIPTION`.
+
+Dependencies by source:
+
+| source | packages |
+|---|---|
+| CRAN | `data.table`, `dplyr`, `tidyr`, `stringr`, `ggplot2`, `plotly`, `htmlwidgets`, `rmarkdown`, `knitr`, `Seurat` (≥ 5.0.0), `SeuratObject` (≥ 5.0.0) |
+| Bioconductor | `ComplexHeatmap` |
+
+Which reports need what:
+
+| report | needs |
+|---|---|
+| 02 DifferentialExpression, 03 Permutation | CRAN table stack + `ComplexHeatmap` only (no Seurat) |
+| 01 QC, 04 MERFISH | the above **plus** `Seurat`/`SeuratObject` (01) and `plotly`/`htmlwidgets` (04) |
+
+### Install dependencies
+
+```r
+install.packages(c(
+  "data.table","dplyr","tidyr","stringr","ggplot2",
+  "plotly","htmlwidgets","rmarkdown","knitr",
+  "Seurat","SeuratObject"            # Seurat pulls SeuratObject
+))
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("ComplexHeatmap")
+```
+
+Exact versions used to author the reports are recorded by the `sessionInfo()`
+chunk at the end of every rendered HTML.
 
 ## Use
 
