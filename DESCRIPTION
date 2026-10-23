@@ -1,0 +1,27 @@
+Package: APomboCocaineSubmissionFigures
+Title: Figure regeneration for the APombo cocaine VTA single-nucleus submission
+Version: 0.1.0
+Description: Standalone, self-contained reports that regenerate the manuscript
+    figures (QC, differential expression, gene-set permutation, MERFISH) from the
+    exported submission tables and objects. Not an installable package; the
+    Imports list documents the pinned runtime environment.
+Encoding: UTF-8
+Depends:
+    R (>= 4.5)
+Imports:
+    data.table,
+    dplyr,
+    tidyr,
+    stringr,
+    ggplot2,
+    ComplexHeatmap,
+    Seurat (>= 5.0.0),
+    SeuratObject (>= 5.0.0),
+    plotly,
+    htmlwidgets,
+    rmarkdown,
+    knitr
+Notes: QC (01) and MERFISH (04) require Seurat/plotly; DifferentialExpression
+    (02) and Permutation (03) need only the table/plot stack
+    (data.table/dplyr/tidyr/ggplot2/ComplexHeatmap). All four target one
+    environment: R 4.5 + Seurat 5.x.

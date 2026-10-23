@@ -1,0 +1,84 @@
+---
+title: "Differential expression — cocaine vs saline (ss + dd)"
+subtitle: "APombo_Cocaine submission figures · canvas 022"
+output:
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 10, fig.height = 4, dev = "png", dpi = 150)
+source(file.path("..", "R", "setup.R"))
+source(file.path(.repo_root, "R", "plot_helpers.R"))
+```
+
+Pseudobulk differential expression (edgeR quasi-likelihood TREAT via muscat),
+combined across the single-injection (ss: coc_d01, coc_d14) and re-injection
+(dd: coc_24h) cohorts. Significance is called on the **raw** p-value.
+
+```{r thresholds}
+# Single visible threshold config (project defaults: raw p<0.05, |log2FC|>0.5).
+P_THR   <- 0.05
+LFC_THR <- 0.5
+de <- data.table::fread(inputs("de_table"))
+```
+
+## DE gene counts
+
+```{r de-counts, fig.height=4, fig.width=6}
+gg <- plot_de_counts(de, P_THR, LFC_THR)
+print(gg); save_fig(gg, "02_DE", "de_counts", width = 6, height = 4)
+```
+
+## Volcano per contrast
+
+```{r volcano}
+gg <- plot_volcano(de, P_THR, LFC_THR)
+print(gg); save_fig(gg, "02_DE", "volcano", width = 11, height = 4)
+```
+
+## MA plot per contrast
+
+```{r ma}
+gg <- plot_ma(de, P_THR, LFC_THR)
+print(gg); save_fig(gg, "02_DE", "ma", width = 11, height = 4)
+```
+
+## Pseudobulk heatmap of DE genes
+
+```{r heatmap, fig.width=8, fig.height=9}
+pb    <- data.table::fread(inputs("pb_counts_dopa"))
+sheet <- data.table::fread(inputs("pb_sheet_dopa"))
+de_genes <- de %>% de_call(P_THR, LFC_THR) %>%
+  dplyr::filter(diff != "No") %>% dplyr::pull(gene_name) %>% unique()
+h <- plot_pseudobulk_heatmap(pb, de_genes, sheet, value = "gene_name",
+                             title = sprintf("%d DE genes (dopa pseudobulk)", length(de_genes)))
+d <- file.path(FIGURE_DIR, "02_DE"); dir.create(d, showWarnings = FALSE, recursive = TRUE)
+pdf(file.path(d, "heatmap_de_genes.pdf"), width = 8, height = 9); ComplexHeatmap::draw(h); dev.off()
+ComplexHeatmap::draw(h)
+```
+
+## Metacluster marker volcanoes (A/B/C/D vs rest)
+
+```{r markers, fig.width=9, fig.height=9}
+markers <- data.table::fread(inputs("markers"))
+gg <- plot_marker_volcano(markers, lfc_thr = 1, padj_thr = 0.01)
+print(gg); save_fig(gg, "02_DE", "marker_volcano", width = 9, height = 9)
+```
+
+## Consistency check
+
+```{r check, echo=TRUE}
+# Up/Down counts at the config thresholds (re-derived) — compare against the
+# pre-thresholded export variants if present in data/.
+de %>% de_call(P_THR, LFC_THR) %>% dplyr::count(contrast, diff) %>%
+  tidyr::pivot_wider(names_from = diff, values_from = n, values_fill = 0) %>%
+  knitr::kable(caption = sprintf("DE calls at p<%g, |log2FC|>%g", P_THR, LFC_THR))
+```
+
+```{r sessioninfo}
+sessionInfo()
+```

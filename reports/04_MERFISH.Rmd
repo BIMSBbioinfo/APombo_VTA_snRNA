@@ -1,0 +1,104 @@
+---
+title: "MERFISH — spatial projection of DN metaclusters"
+subtitle: "APombo_Cocaine submission figures · canvas 024"
+output:
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 10, fig.height = 7, dev = "png", dpi = 150)
+source(file.path("..", "R", "setup.R"))
+source(file.path(.repo_root, "R", "plot_helpers.R"))
+```
+
+MERFISH VTA cells, their mapping to scRNA dopaminergic subclusters, and the
+A/B/C/D metacluster 3D spatial projections.
+
+```{r load}
+bundle  <- readRDS(inputs("merfish_objects"))   # merfish_3d, meta_groups, make_3d_plot, ...
+cells   <- data.table::fread(inputs("merfish_cells"))
+mapping <- data.table::fread(inputs("merfish_mapping"))
+sub_cols <- if (!is.null(bundle$subcluster_cols)) bundle$subcluster_cols else SUBCLUSTER_COLS
+meta_groups <- if (!is.null(bundle$meta_groups)) bundle$meta_groups else METACLUSTER_MEMBERS
+```
+
+## 3D metacluster projections (interactive)
+
+```{r widgets-3d, results="asis"}
+# Regenerate the four A/B/C/D 3D widgets from the bundle's own make_3d_plot().
+outd <- file.path(FIGURE_DIR, "04_MERFISH"); dir.create(outd, showWarnings = FALSE, recursive = TRUE)
+if (is.function(bundle$make_3d_plot) && !is.null(bundle$merfish_3d)) {
+  suppressPackageStartupMessages({ library(plotly); library(htmlwidgets) })
+  for (mc in names(meta_groups)) {
+    ok <- tryCatch({
+      cl <- intersect(meta_groups[[mc]], unique(bundle$merfish_3d$scrna_subcluster))
+      w  <- bundle$make_3d_plot(bundle$merfish_3d, cl, paste("Metacluster", mc), 3.5)
+      htmlwidgets::saveWidget(w, file.path(outd, sprintf("merfish_3d-metacluster_%s.html", mc)),
+                              selfcontained = TRUE)
+      TRUE
+    }, error = function(e) { message("3D widget ", mc, " failed: ", conditionMessage(e)); FALSE })
+    cat("\n-", mc, if (ok) "— written" else "— FAILED (see log)", "\n")
+  }
+} else {
+  cat("\n_make_3d_plot / merfish_3d not found in the bundle — 3D widgets skipped._\n")
+}
+```
+
+## Spatial slices (2D)
+
+```{r slices-metacluster, fig.width=12, fig.height=8}
+cells$metacluster <- factor(cells$metacluster, levels = c("A","B","C","D"))
+gg <- ggplot(subset(cells, !is.na(metacluster)), aes(x, y, colour = metacluster)) +
+  geom_point(size = 0.3, alpha = 0.7) +
+  scale_colour_manual(values = METACLUSTER_COLS, na.value = "grey85", name = NULL) +
+  facet_wrap(~ brain_section_label) + coord_equal() +
+  labs(title = "MERFISH VTA cells by metacluster") + theme_submission()
+print(gg); save_fig(gg, "04_MERFISH", "slices_metacluster", width = 12, height = 8)
+```
+
+```{r slices-subcluster, fig.width=12, fig.height=8}
+gg <- ggplot(cells, aes(x, y, colour = factor(scrna_subcluster))) +
+  geom_point(size = 0.3, alpha = 0.7) +
+  scale_colour_manual(values = sub_cols, na.value = "grey85", name = "subcluster") +
+  facet_wrap(~ brain_section_label) + coord_equal() +
+  labs(title = "MERFISH VTA cells by scRNA subcluster") + theme_submission() +
+  guides(colour = guide_legend(override.aes = list(size = 2)))
+print(gg); save_fig(gg, "04_MERFISH", "slices_subcluster", width = 12, height = 8)
+```
+
+## scRNA ↔ MERFISH mapping
+
+```{r mapping, fig.width=8, fig.height=5}
+# The exported mapping is one best-match row per MERFISH cluster (the full NxM
+# correlation matrix is not exported). Show the best-match correlation per
+# MERFISH cluster, coloured by assigned metacluster, and how many MERFISH
+# clusters map to each scRNA subcluster.
+mapping$metacluster <- factor(mapping$metacluster, levels = c("A","B","C","D"))
+gg1 <- ggplot(mapping, aes(reorder(merfish_cluster_id, correlation), correlation,
+                           fill = metacluster)) +
+  geom_col() + coord_flip() +
+  scale_fill_manual(values = METACLUSTER_COLS, na.value = "grey85", name = NULL) +
+  labs(x = "MERFISH cluster", y = "best-match correlation") + theme_submission() +
+  theme(axis.text.y = element_text(size = 5))
+print(gg1); save_fig(gg1, "04_MERFISH", "mapping_best_correlation", width = 8, height = 7)
+
+tab <- mapping %>% dplyr::count(scrna_subcluster_filt, name = "n_merfish_clusters") %>%
+  dplyr::arrange(dplyr::desc(n_merfish_clusters))
+knitr::kable(tab, caption = "MERFISH clusters mapped per scRNA subcluster")
+```
+
+## Metacluster membership
+
+```{r membership}
+mem <- data.frame(metacluster = names(meta_groups),
+                  subclusters = vapply(meta_groups, paste, collapse = ", ", FUN.VALUE = ""))
+knitr::kable(mem, row.names = FALSE, caption = "A/B/C/D metacluster membership")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```

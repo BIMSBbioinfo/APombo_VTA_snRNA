@@ -1,0 +1,92 @@
+---
+title: "Gene-set permutation — coordinated regulation"
+subtitle: "APombo_Cocaine submission figures · canvas 023"
+output:
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 10, fig.height = 4, dev = "png", dpi = 150)
+source(file.path("..", "R", "setup.R"))
+source(file.path(.repo_root, "R", "plot_helpers.R"))
+```
+
+Gene-set differential-expression by permutation against size-matched random
+gene sets. `dstat` = summary statistics (observed vs null, Z, P); `dperm` = the
+raw per-permutation draws (the null distributions behind the density plots).
+
+```{r load}
+# Summaries (always required) + raw draws (required for the density plots).
+perm_all  <- data.table::fread(inputs("perm_all"))
+perm_sub  <- data.table::fread(inputs("perm_subcluster"))
+perm_meta <- data.table::fread(inputs("perm_metacluster"))
+draws_all <- data.table::fread(inputs("perm_draws_all"))   # errors with a clear
+draws_sub <- data.table::fread(inputs("perm_draws_sub"))   # message if the dperm
+draws_meta<- data.table::fread(inputs("perm_draws_meta"))  # re-knit wasn't done
+```
+
+## All-dopa: null distributions per gene set
+
+```{r density, fig.width=9, fig.height=3, results="asis"}
+for (gs in sort(unique(draws_all$gene_set_name))) {
+  cat("\n\n### ", gs, "\n\n", sep = "")
+  gg <- plot_perm_density(draws_all, perm_all, gene_set = gs)
+  print(gg); save_fig(gg, "03_Permutation", paste0("density_all_dopa-", gs), width = 9, height = 3)
+}
+```
+
+## All-dopa: observed vs null (median Z)
+
+```{r zdot, fig.width=7, fig.height=5}
+d <- perm_all %>% dplyr::mutate(contrast = factor(CONTRAST_LABELS[contrast],
+                                                  levels = unname(CONTRAST_LABELS)))
+gg <- ggplot(d, aes(median_z_score, reorder(gene_set_name, median_z_score),
+                    colour = contrast)) +
+  geom_vline(xintercept = 0, colour = "grey60") +
+  geom_point(size = 2) +
+  scale_colour_manual(values = unname(CONTRAST_COLS), name = NULL) +
+  labs(x = "median Z score", y = NULL) + theme_submission()
+print(gg); save_fig(gg, "03_Permutation", "zscore_dot_all_dopa", width = 7, height = 5)
+```
+
+## Per-subcluster z-score heatmap
+
+```{r heat-sub, fig.width=11, fig.height=7}
+gg <- plot_perm_zscore_heatmap(perm_sub, cluster_levels = SUBCLUSTER_ORDER)
+print(gg); save_fig(gg, "03_Permutation", "zscore_heatmap_per_subcluster", width = 11, height = 7)
+```
+
+## Per-metacluster z-score heatmap
+
+```{r heat-meta, fig.width=7, fig.height=7}
+gg <- plot_perm_zscore_heatmap(perm_meta, cluster_levels = c("A","B","C","D"))
+print(gg); save_fig(gg, "03_Permutation", "zscore_heatmap_per_metacluster", width = 7, height = 7)
+```
+
+## Consistency checks
+
+```{r check, echo=TRUE}
+# (1) z / p recompute from the summary columns.
+chk <- perm_all %>% dplyr::mutate(
+  z_ok = isTRUE(all.equal((data_median - perm_median)/perm_sd_median, median_z_score,
+                          tolerance = 1e-6, check.attributes = FALSE)),
+  p_ok = isTRUE(all.equal(pnorm(abs(median_z_score), lower.tail = FALSE), median_p_value,
+                          tolerance = 1e-6, check.attributes = FALSE)))
+cat("median_z_score recompute matches:", all(chk$z_ok, na.rm = TRUE), "\n")
+cat("median_p_value recompute matches:", all(chk$p_ok, na.rm = TRUE), "\n")
+
+# (2) dperm <-> dstat: draws reproduce perm_median / perm_sd_median.
+agg <- draws_all %>% dplyr::group_by(gene_set_name, contrast, cluster) %>%
+  dplyr::summarise(pm = median(med), ps = sd(med), .groups = "drop") %>%
+  dplyr::inner_join(perm_all, by = c("gene_set_name","contrast","cluster"))
+cat("draws reproduce perm_median (max |diff|):",
+    round(max(abs(agg$pm - agg$perm_median), na.rm = TRUE), 5), "\n")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```

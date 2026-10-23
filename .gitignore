@@ -1,0 +1,17 @@
+# Input data (dropped by the user; large; hosted on bimsbstatic)
+data/*
+!data/README.md
+
+# Rendered outputs
+figures/
+*.html
+*_cache/
+*_files/
+
+# R / editor cruft
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.swp
+.DS_Store
