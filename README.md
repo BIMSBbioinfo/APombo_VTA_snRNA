@@ -1,10 +1,6 @@
 # APombo cocaine VTA — submission figures
 
-Standalone, reproducible regeneration of the manuscript figures from the
-**exported** data only. No dependency on the analysis project, its `Config.txt`,
-or `Mylib` — clone, drop the exported files into `data/`, and knit.
-
-Study: single-nucleus RNA-seq of mouse VTA dopaminergic neurons after cocaine.
+Single-nucleus RNA-seq of mouse VTA dopaminergic neurons after cocaine.
 Two cohorts — **ss** = single-injection (timepoints d01 = 24 h, d14) and
 **dd** = re-injection (24 h after re-exposure).
 
