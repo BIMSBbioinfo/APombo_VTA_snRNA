@@ -1,4 +1,4 @@
-# Input data (dropped by the user; large; hosted on bimsbstatic)
+# Input data (dropped by the user; large)
 data/*
 !data/README.md
 
