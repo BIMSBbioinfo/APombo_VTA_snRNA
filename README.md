@@ -47,18 +47,38 @@ Which reports need what:
 
 ### Install dependencies
 
-```r
-install.packages(c(
-  "data.table","dplyr","tidyr","stringr","ggplot2",
-  "plotly","htmlwidgets","rmarkdown","knitr",
-  "Seurat","SeuratObject"            # Seurat pulls SeuratObject
-))
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install("ComplexHeatmap")
+One command installs everything (CRAN + Bioconductor, via `BiocManager`):
+
+```sh
+Rscript install.R
 ```
 
-Exact versions used to author the reports are recorded by the `sessionInfo()`
-chunk at the end of every rendered HTML.
+`install.R` is idempotent (skips already-installed packages), gates on R ≥ 4.5,
+and verifies the install at the end. Equivalent manual steps:
+
+```r
+install.packages("BiocManager")
+BiocManager::install(c(
+  "data.table","dplyr","tidyr","stringr","ggplot2","rmarkdown","knitr",
+  "Seurat","SeuratObject","plotly","htmlwidgets","ComplexHeatmap"))
+```
+
+### Reproducible lockfile (optional, recommended)
+
+For a byte-for-byte reproducible environment, snapshot a real `renv.lock` **in
+the environment you render in** (versions + hashes can only come from installed
+packages, so this must be run on your machine, not committed blind):
+
+```r
+install.packages("renv")
+renv::init(bare = TRUE)   # adopt this repo as an renv project
+renv::snapshot()          # writes renv.lock from the installed versions
+```
+
+Commit the resulting `renv.lock` (+ `renv/activate.R`, `renv/settings.json`);
+`.gitignore` already excludes the `renv/library/`. Anyone can then reproduce with
+`renv::restore()`. Exact versions are also recorded by the `sessionInfo()` chunk
+at the end of every rendered HTML.
 
 ## Use
 
