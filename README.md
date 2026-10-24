@@ -59,27 +59,13 @@ BiocManager::install(c(
   "Seurat","SeuratObject","plotly","htmlwidgets","ComplexHeatmap"))
 ```
 
-### Reproducible lockfile (optional, recommended)
-
-For a byte-for-byte reproducible environment, snapshot a real `renv.lock` **in
-the environment you render in** (versions + hashes can only come from installed
-packages, so this must be run on your machine, not committed blind):
-
-```r
-install.packages("renv")
-renv::init(bare = TRUE)   # adopt this repo as an renv project
-renv::snapshot()          # writes renv.lock from the installed versions
-```
-
-Commit the resulting `renv.lock` (+ `renv/activate.R`, `renv/settings.json`);
-`.gitignore` already excludes the `renv/library/`. Anyone can then reproduce with
-`renv::restore()`. Exact versions are also recorded by the `sessionInfo()` chunk
-at the end of every rendered HTML.
+Exact versions used to author the reports are recorded by the `sessionInfo()`
+chunk at the end of every rendered HTML.
 
 ## Use
 
-1. Place the exported files in `data/` (see `data/README.md` for the list and
-   the bimsbstatic URLs). Dated filenames are fine — the newest match wins.
+1. Place the exported files in `data/` (see `data/README.md` for the list).
+   Dated filenames are fine — the newest match wins.
 2. Render:
    ```sh
    Rscript render_all.R          # all reports

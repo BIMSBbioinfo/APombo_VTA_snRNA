@@ -4,9 +4,6 @@ Drop the exported submission files here. Files may keep their `YYMMDD.` date
 prefix (the newest match wins) or be undated. Nothing in `data/` is committed
 (see `.gitignore`), except this README.
 
-All files are mirrored at:
-`http://bimsbstatic.mdc-berlin.de/akalin/APombo_Cocaine/Submission/`
-
 | file (canonical name) | used by | description |
 |---|---|---|
 | `All_Filtered_Cells_Combined.rds` | 01 QC | All filtered nuclei (ss+dd), Seurat v5. |
@@ -28,7 +25,7 @@ All files are mirrored at:
 | `merfish_3d_objects.rds` | 04 MERFISH | Bundle: merfish_3d, meta_groups, subcluster_cols, cluster_mapping, make_3d_plot(). |
 
 Column-level descriptions for the tables are in the exported data dictionaries
-(`*column*description*.md` on bimsbstatic).
+(`*column*description*.md`).
 
 Check what's resolved from a running R session:
 ```r
