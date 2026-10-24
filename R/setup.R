@@ -106,8 +106,81 @@ input_status <- function(keys = names(INPUT_PATTERNS)) {
 }
 
 # ---------------------------------------------------------------------------- #
-# Palettes — copied verbatim from the analysis project (Config.txt
-# globals$params$colors) so figures match the manuscript.
+# Column contract: the minimal set of columns each tabular input MUST carry for
+# the reports to read it. Only tabular (.tsv) inputs appear here — the two .rds
+# objects can't be header-checked without loading them (the QC / MERFISH Rmds
+# detect their columns defensively at runtime instead).
+REQUIRED_COLS <- list(
+  pb_counts_all    = c("gene_name", "gene_id"),
+  pb_counts_dopa   = c("gene_name", "gene_id"),
+  pb_sheet_all     = c("sample_id", "experiment", "n_nuclei", "group_id",
+                       "treatment", "time", "replicate", "technical"),
+  pb_sheet_dopa    = c("sample_id", "experiment", "n_nuclei", "group_id",
+                       "treatment", "time", "replicate", "technical"),
+  de_table         = c("gene_id", "gene_name", "logFC", "logCPM", "p_val", "contrast"),
+  markers          = c("gene_id", "gene_name", "metacluster", "avg_log2FC",
+                       "p_val", "p_val_adj", "pct.1", "pct.2"),
+  perm_all         = c("gene_set_name", "contrast", "cluster",
+                       "median_z_score", "median_p_value"),
+  perm_subcluster  = c("gene_set_name", "contrast", "cluster",
+                       "median_z_score", "median_p_value"),
+  perm_metacluster = c("gene_set_name", "contrast", "cluster",
+                       "median_z_score", "median_p_value"),
+  perm_draws_all   = c("gene_set_name", "contrast", "cluster", "mean", "med"),
+  perm_draws_sub   = c("gene_set_name", "contrast", "cluster", "mean", "med"),
+  perm_draws_meta  = c("gene_set_name", "contrast", "cluster", "mean", "med"),
+  merfish_cells    = c("brain_section_label", "x", "y", "z", "subclass",
+                       "cluster_id", "scrna_subcluster", "metacluster"),
+  merfish_mapping  = c("merfish_cluster_id", "scrna_subcluster",
+                       "scrna_subcluster_filt", "correlation", "metacluster")
+)
+
+# Read just the header of a delimited file (no data rows) -> character vector.
+.read_header <- function(path) {
+  names(data.table::fread(path, nrows = 0L, header = TRUE))
+}
+
+# check_input_columns(keys, strict): verify present tabular inputs carry their
+# required columns. Returns a data.frame (one row per checked key) with status
+# OK / MISSING FILE / MISSING COLS and the missing columns listed. Files not
+# on disk are reported as "MISSING FILE" (not an error) so the checker can run
+# before every input is dropped in. With strict = TRUE, stop() if any present
+# file is missing required columns.
+check_input_columns <- function(keys = names(REQUIRED_COLS), strict = FALSE) {
+  keys <- intersect(keys, names(REQUIRED_COLS))
+  rows <- lapply(keys, function(k) {
+    path <- tryCatch(inputs(k, required = FALSE), error = function(e) NA_character_)
+    if (is.na(path)) {
+      return(data.frame(key = k, file = "MISSING", status = "MISSING FILE",
+                        missing = "", stringsAsFactors = FALSE))
+    }
+    have    <- tryCatch(.read_header(path),
+                        error = function(e) character(0))
+    need    <- REQUIRED_COLS[[k]]
+    missing <- setdiff(need, have)
+    data.frame(
+      key     = k,
+      file    = basename(path),
+      status  = if (!length(have)) "UNREADABLE"
+                else if (length(missing)) "MISSING COLS" else "OK",
+      missing = paste(missing, collapse = ", "),
+      stringsAsFactors = FALSE
+    )
+  })
+  res <- do.call(rbind, rows)
+  row.names(res) <- NULL
+  bad <- res[res$status %in% c("MISSING COLS", "UNREADABLE"), , drop = FALSE]
+  if (strict && nrow(bad)) {
+    stop("Input column check failed:\n",
+         paste(sprintf("  %s (%s): %s [%s]",
+                       bad$key, bad$file, bad$status, bad$missing),
+               collapse = "\n"), call. = FALSE)
+  }
+  res
+}
+
+# ---------------------------------------------------------------------------- #
+# Palettes — fixed to match the manuscript figures.
 
 # Condition (treatment_time) colours.
 CONDITION_COLS <- c(
@@ -135,7 +208,7 @@ CONTRAST_LABELS <- c(
 DIFF_COLS <- c(Up = "#D7191C", Down = "#2C7BB6", No = "grey70")
 
 # Subcluster colours: ggplot2 default hue palette with C10 overridden to
-# firebrick (Config.txt globals$params$make_subcluster_colors / overrides).
+# firebrick, matching the manuscript subcluster colour scheme.
 make_subcluster_colors <- function(cluster_names,
                                     overrides = c(C10 = "firebrick")) {
   cluster_names <- sort(unique(as.character(cluster_names)))
@@ -151,7 +224,7 @@ make_subcluster_colors <- function(cluster_names,
 SUBCLUSTER_LEVELS <- sprintf("C%02d", 0:15)
 SUBCLUSTER_COLS   <- make_subcluster_colors(SUBCLUSTER_LEVELS)
 
-# Metacluster A/B/C/D and their member subclusters (Config merfish$combinations).
+# Metacluster A/B/C/D and their member subclusters.
 METACLUSTER_MEMBERS <- list(
   A = c("C08","C10","C11","C14","C15"),
   B = c("C09","C13","C06","C07","C02"),
@@ -166,7 +239,7 @@ SUBCLUSTER_ORDER <- c("C13","C09","C02","C06","C07","C01","C00","C03",
                       "C04","C08","C15","C10","C14","C11","C05","C12")
 
 # ---------------------------------------------------------------------------- #
-# Shared ggplot2 theme (matches the analysis project's globals$theme spirit).
+# Shared ggplot2 theme for all reports.
 theme_submission <- function(base_size = 11) {
   theme_bw(base_size = base_size) +
     theme(
