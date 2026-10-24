@@ -180,6 +180,109 @@ check_input_columns <- function(keys = names(REQUIRED_COLS), strict = FALSE) {
 }
 
 # ---------------------------------------------------------------------------- #
+# Format contract: the expected KIND of each input.
+#   "table"  -> a delimited text table (read with fread)
+#   "seurat" -> an .rds holding a Seurat v5 object
+#   "bundle" -> an .rds holding a plain list (the MERFISH 3D bundle)
+INPUT_FORMATS <- c(
+  all_cells_rds    = "seurat",
+  dopa_rds         = "seurat",
+  pb_counts_all    = "table",
+  pb_counts_dopa   = "table",
+  pb_sheet_all     = "table",
+  pb_sheet_dopa    = "table",
+  de_table         = "table",
+  perm_all         = "table",
+  perm_subcluster  = "table",
+  perm_metacluster = "table",
+  perm_draws_all   = "table",
+  perm_draws_sub   = "table",
+  perm_draws_meta  = "table",
+  markers          = "table",
+  merfish_cells    = "table",
+  merfish_mapping  = "table",
+  merfish_objects  = "bundle"
+)
+
+# Cheap check that a file is a serialized R object (.rds), without loading it.
+# Sniffs the leading magic bytes for the compressions readRDS accepts
+# (gzip / bzip2 / xz) or an uncompressed XDR/ASCII serialization header.
+.looks_like_rds <- function(path) {
+  con <- file(path, "rb"); on.exit(close(con))
+  b <- readBin(con, "raw", n = 6L)
+  if (length(b) < 2L) return(FALSE)
+  hex <- function(i) as.integer(b[i])
+  gzip  <- hex(1) == 0x1f && hex(2) == 0x8b
+  bzip2 <- hex(1) == 0x42 && hex(2) == 0x5a && hex(3) == 0x68           # "BZh"
+  xz    <- length(b) >= 6 && identical(as.integer(b[1:6]),
+                                       c(0xFD,0x37,0x7A,0x58,0x5A,0x00)) # xz
+  xdr   <- rawToChar(b[1:2]) %in% c("X\n", "A\n", "B\n")                # none
+  gzip || bzip2 || xz || xdr
+}
+
+# check_input_formats(keys, deep, strict): verify each present input is the
+# expected KIND of file (table vs Seurat/bundle .rds).
+#   deep = FALSE (default): shallow — tables must parse as >=2-column tables;
+#     .rds files must have a valid serialized-object signature (NOT loaded, so
+#     the large Seurat objects aren't pulled into memory).
+#   deep = TRUE: additionally readRDS() each .rds and check its class
+#     ("seurat" -> inherits "Seurat"; "bundle" -> is a list). This loads the
+#     objects fully and is memory-heavy — run only where RAM allows.
+# Returns a data.frame (key / file / expected / status / detail). Status is
+# OK / MISSING FILE / WRONG EXT / NOT A TABLE / NOT AN RDS / WRONG CLASS /
+# UNREADABLE. strict = TRUE stops() on any present-file failure.
+check_input_formats <- function(keys = names(INPUT_FORMATS),
+                                 deep = FALSE, strict = FALSE) {
+  keys <- intersect(keys, names(INPUT_FORMATS))
+  rows <- lapply(keys, function(k) {
+    expected <- INPUT_FORMATS[[k]]
+    path <- tryCatch(inputs(k, required = FALSE), error = function(e) NA_character_)
+    mk <- function(status, detail = "")
+      data.frame(key = k, file = if (is.na(path)) "MISSING" else basename(path),
+                 expected = expected, status = status, detail = detail,
+                 stringsAsFactors = FALSE)
+    if (is.na(path)) return(mk("MISSING FILE"))
+    ext <- tolower(tools::file_ext(path))
+
+    if (expected == "table") {
+      if (!ext %in% c("tsv", "txt", "csv", "gz"))
+        return(mk("WRONG EXT", paste0(".", ext, " (want .tsv)")))
+      d <- tryCatch(data.table::fread(path, nrows = 5L, header = TRUE),
+                    error = function(e) NULL)
+      if (is.null(d))        return(mk("UNREADABLE"))
+      if (ncol(d) < 2L)      return(mk("NOT A TABLE", paste0(ncol(d), " column(s)")))
+      return(mk("OK", paste0(ncol(d), " cols")))
+    }
+
+    # expected is an .rds object (seurat | bundle)
+    if (ext != "rds")        return(mk("WRONG EXT", paste0(".", ext, " (want .rds)")))
+    if (!isTRUE(tryCatch(.looks_like_rds(path), error = function(e) FALSE)))
+      return(mk("NOT AN RDS", "bad serialization signature"))
+    if (!deep) return(mk("OK", "rds signature (not loaded)"))
+
+    obj <- tryCatch(readRDS(path), error = function(e) NULL)
+    if (is.null(obj))        return(mk("UNREADABLE", "readRDS failed"))
+    cls <- paste(class(obj), collapse = "/")
+    ok  <- switch(expected,
+                  seurat = inherits(obj, "Seurat"),
+                  bundle = is.list(obj),
+                  FALSE)
+    if (!ok)                 return(mk("WRONG CLASS", cls))
+    mk("OK", cls)
+  })
+  res <- do.call(rbind, rows)
+  row.names(res) <- NULL
+  bad <- res[!res$status %in% c("OK", "MISSING FILE"), , drop = FALSE]
+  if (strict && nrow(bad)) {
+    stop("Input format check failed:\n",
+         paste(sprintf("  %s (%s): %s [%s]",
+                       bad$key, bad$file, bad$status, bad$detail),
+               collapse = "\n"), call. = FALSE)
+  }
+  res
+}
+
+# ---------------------------------------------------------------------------- #
 # Palettes — fixed to match the manuscript figures.
 
 # Condition (treatment_time) colours.
